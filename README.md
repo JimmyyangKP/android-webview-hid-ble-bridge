@@ -101,7 +101,7 @@ Add to `AndroidManifest.xml`:
 ```java
 public class MainActivity extends Activity {
     private WebView webView;
-    private WebBluetoothBridge blebridge;
+    private WebBluetoothBridge bleBridge;
     private WebHIDBridge hidBridge;
 
     @Override
