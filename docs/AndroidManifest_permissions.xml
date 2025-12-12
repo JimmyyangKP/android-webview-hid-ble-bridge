@@ -1,0 +1,103 @@
+<!--
+    AndroidManifest.xml Permission Snippet for Web HID & BLE Bridge
+
+    Copyright (c) 2025 KwickPOS - Jimmy
+    Licensed under the MIT License.
+
+    Add these permissions and features to your AndroidManifest.xml
+    inside the <manifest> tag (before <application>)
+-->
+
+<!-- ==================== Bluetooth Permissions ==================== -->
+
+<!-- Legacy Bluetooth permissions (Android 11 and below) -->
+<uses-permission android:name="android.permission.BLUETOOTH"
+    android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+    android:maxSdkVersion="30" />
+
+<!-- Android 12+ Bluetooth permissions -->
+<!-- BLUETOOTH_CONNECT: Required to connect to paired devices -->
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+<!-- BLUETOOTH_SCAN: Required to scan for BLE devices -->
+<!-- Note: We scan without filters (null) to find all BLE devices,
+     which requires location permission on Android 11 and below -->
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+
+<!-- Location permissions (required for BLE scanning on Android 11 and below) -->
+<!-- Also required on Android 12+ if scanning without usesPermissionFlags="neverForLocation" -->
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+
+<!-- ==================== USB Permissions ==================== -->
+
+<!-- USB Host permission for HID devices -->
+<!-- Note: USB permission dialog is shown per-device at runtime -->
+<uses-permission android:name="android.permission.USB_PERMISSION" />
+
+
+<!-- ==================== Hardware Features ==================== -->
+
+<!-- Bluetooth LE feature declaration -->
+<!-- android:required="false" means app can still be installed on devices without BLE -->
+<uses-feature android:name="android.hardware.bluetooth_le"
+    android:required="false" />
+
+<!-- USB Host feature declaration -->
+<!-- android:required="false" means app can still be installed on devices without USB host -->
+<uses-feature android:name="android.hardware.usb.host"
+    android:required="false" />
+
+
+<!--
+    ==================== COMPLETE EXAMPLE ====================
+
+    Here's a complete AndroidManifest.xml example:
+
+    <?xml version="1.0" encoding="utf-8"?>
+    <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+        android:versionCode="1"
+        android:versionName="1.0">
+
+        <uses-sdk
+            android:minSdkVersion="17"
+            android:targetSdkVersion="35" />
+
+        <!- - Bluetooth permissions - ->
+        <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+        <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+        <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+        <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+        <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+        <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+        <!- - USB permissions - ->
+        <uses-permission android:name="android.permission.USB_PERMISSION" />
+
+        <!- - Hardware features - ->
+        <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+        <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+
+        <application
+            android:allowBackup="true"
+            android:label="@string/app_name"
+            android:icon="@mipmap/ic_launcher"
+            android:theme="@style/AppTheme">
+
+            <activity
+                android:name=".MainActivity"
+                android:label="@string/app_name"
+                android:exported="true"
+                android:configChanges="orientation|screenSize">
+                <intent-filter>
+                    <action android:name="android.intent.action.MAIN"/>
+                    <category android:name="android.intent.category.LAUNCHER"/>
+                </intent-filter>
+            </activity>
+
+        </application>
+
+    </manifest>
+-->
