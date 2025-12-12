@@ -317,31 +317,48 @@ public class WebHIDBridge {
             return;
         }
 
-        try {
-            byte[] data = hexToBytes(hexData);
+        // Run on background thread to avoid blocking UI
+        final UsbDeviceConnection conn = currentConnection;
+        final UsbEndpoint endpoint = outputEndpoint;
+        final int ifaceNum = currentInterface.getId();
 
-            byte[] report;
-            if (reportId == 0) {
-                report = data;
-            } else {
-                report = new byte[data.length + 1];
-                report[0] = (byte) reportId;
-                System.arraycopy(data, 0, report, 1, data.length);
+        new Thread(() -> {
+            try {
+                byte[] data = hexToBytes(hexData);
+
+                byte[] report;
+                if (reportId == 0) {
+                    report = data;
+                } else {
+                    report = new byte[data.length + 1];
+                    report[0] = (byte) reportId;
+                    System.arraycopy(data, 0, report, 1, data.length);
+                }
+
+                int timeout = 5000;
+
+                // Use controlTransfer for HID SET_REPORT
+                // requestType: 0x21 = host to device, class, interface
+                // request: 0x09 = SET_REPORT
+                // value: (reportType << 8) | reportId, reportType 2 = output
+                int requestType = 0x21;
+                int request = 0x09;  // SET_REPORT
+                int value = (2 << 8) | reportId;  // Output report
+                int index = ifaceNum;
+
+                int transferred = conn.controlTransfer(requestType, request, value, index, report, report.length, timeout);
+
+                if (transferred >= 0) {
+                    executeCallback(callbackName, createSuccessResult("{}"));
+                } else {
+                    executeCallback(callbackName, createErrorResult("Failed to send report: " + transferred));
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error sending report", e);
+                executeCallback(callbackName, createErrorResult("Send error: " + e.getMessage()));
             }
-
-            int timeout = 5000;
-            int transferred = currentConnection.bulkTransfer(outputEndpoint, report, report.length, timeout);
-
-            if (transferred == report.length) {
-                executeCallback(callbackName, createSuccessResult("{}"));
-            } else {
-                executeCallback(callbackName, createErrorResult("Failed to send complete report: " + transferred + " of " + report.length));
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error sending report", e);
-            executeCallback(callbackName, createErrorResult("Send error: " + e.getMessage()));
-        }
+        }).start();
     }
 
     /**

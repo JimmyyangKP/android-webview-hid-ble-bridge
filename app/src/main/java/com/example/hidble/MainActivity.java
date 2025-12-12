@@ -67,8 +67,8 @@ public class MainActivity extends Activity {
             }
         });
 
-        // Load demo page from assets
-        webView.loadUrl("file:///android_asset/index.html");
+        // Load MagTek demo page
+        webView.loadUrl("https://rms.magensa.net/Test/demo/mmsdemo.html");
     }
 
     private void configureWebView() {
