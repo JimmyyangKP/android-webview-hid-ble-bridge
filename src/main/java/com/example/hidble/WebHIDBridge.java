@@ -32,6 +32,8 @@ import org.json.JSONObject;
 import java.util.HashMap;
 import java.util.Map;
 
+import static android.content.Context.RECEIVER_EXPORTED;
+
 /**
  * WebHIDBridge - JavaScript Interface for Web HID API
  *
@@ -78,6 +80,11 @@ public class WebHIDBridge {
     // Vendor ID filter (customize for your devices)
     private int vendorIdFilter = DEFAULT_VENDOR_ID;
 
+    private PendingIntent mPermissionIntent;
+
+    private Object mPermissionEvent;
+    private boolean mPermissionGranted = false;
+
     public WebHIDBridge(Activity activity, WebView webView) {
         if (activity == null) {
             throw new IllegalArgumentException("Activity cannot be null");
@@ -95,11 +102,34 @@ public class WebHIDBridge {
             Log.w(TAG, "UsbManager not available on this device");
         }
 
+        if (android.os.Build.VERSION.SDK_INT >= 34)
+        {
+            Log.i(TAG, "*** Android 14 or higher");
+            Intent explicitIntent = new Intent(ACTION_USB_PERMISSION);
+            explicitIntent.setPackage(activity.getPackageName());
+            mPermissionIntent = PendingIntent.getBroadcast(activity, 0, explicitIntent, PendingIntent.FLAG_MUTABLE);
+        }
+        else if (android.os.Build.VERSION.SDK_INT > 30)
+        {
+            mPermissionIntent = PendingIntent.getBroadcast(activity, 0, new Intent(ACTION_USB_PERMISSION), PendingIntent.FLAG_MUTABLE);
+        }
+        else
+        {
+            mPermissionIntent = PendingIntent.getBroadcast(activity, 0, new Intent(ACTION_USB_PERMISSION), 0);
+        }
+
         // Register USB permission receiver
         IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
-        activity.registerReceiver(usbReceiver, filter);
+        if (android.os.Build.VERSION.SDK_INT >= 34)
+        {
+            activity.registerReceiver(usbReceiver, filter, RECEIVER_EXPORTED);
+        }
+        else
+        {
+            activity.registerReceiver(usbReceiver, filter);
+        }
     }
 
     /**
@@ -230,9 +260,26 @@ public class WebHIDBridge {
         }
 
         if (!usbManager.hasPermission(device)) {
-            Log.e(TAG, "openDevice FAILED - no permission");
-            executeCallback(callbackName, createErrorResult("No permission for device"));
-            return;
+            mPermissionEvent = new Object();
+            mPermissionGranted = false;
+            usbManager.requestPermission(device, mPermissionIntent);
+            synchronized (mPermissionEvent)
+            {
+                try
+                {
+                    mPermissionEvent.wait(30000);
+                }
+                catch (Exception ex)
+                {
+
+                }
+                if (!mPermissionGranted)
+                {
+                    Log.e(TAG, "openDevice FAILED - no permission");
+                    executeCallback(callbackName, createErrorResult("No permission for device"));
+                    return;
+                }
+            }
         }
 
         try {
@@ -337,7 +384,7 @@ public class WebHIDBridge {
 
                 int timeout = 5000;
 
-                // Use controlTransfer for HID SET_REPORT
+                // Try controlTransfer first (HID SET_REPORT)
                 // requestType: 0x21 = host to device, class, interface
                 // request: 0x09 = SET_REPORT
                 // value: (reportType << 8) | reportId, reportType 2 = output
@@ -530,6 +577,18 @@ public class WebHIDBridge {
         outputEndpoint = null;
     }
 
+    protected void notifyPermissionResult(boolean result)
+    {
+        if (mPermissionEvent != null)
+        {
+            synchronized (mPermissionEvent)
+            {
+                mPermissionGranted = result;
+                mPermissionEvent.notifyAll();
+            }
+        }
+    }
+
     private final BroadcastReceiver usbReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -542,6 +601,8 @@ public class WebHIDBridge {
                         if (device != null) {
                             Log.d(TAG, "USB permission granted for: " + device.getDeviceName());
                             connectedDevices.put(device.getDeviceName(), device);
+
+                            notifyPermissionResult(true);
 
                             if (pendingPermissionCallback != null) {
                                 try {
@@ -560,6 +621,7 @@ public class WebHIDBridge {
                         }
                     } else {
                         Log.d(TAG, "USB permission denied");
+                        notifyPermissionResult(false);
                         if (pendingPermissionCallback != null) {
                             executeCallback(pendingPermissionCallback, createErrorResult("USB permission denied by user"));
                             pendingPermissionCallback = null;
